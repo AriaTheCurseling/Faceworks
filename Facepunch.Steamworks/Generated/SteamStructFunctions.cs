@@ -249,11 +249,17 @@ namespace Steamworks.Data
 		
 	}
 	
-	internal partial struct NetMsg
+	internal partial struct NetMsg// : IDisposable
 	{
 		[DllImport( Platform.LibraryName, EntryPoint = "SteamAPI_SteamNetworkingMessage_t_Release", CallingConvention = Platform.CC)]
 		internal static unsafe extern void InternalRelease( NetMsg* self );
 		
+		//TODO:: Implement IDisposable
+
+		// [DllImport( Platform.LibraryName, EntryPoint = "SteamAPI_SteamNetworkingMessage_t_Release", CallingConvention = Platform.CC)]
+		// internal static extern void InternalRelease( ref NetMsg self );
+
+		// public void Dispose() => InternalRelease( ref this );
 	}
 	
 }

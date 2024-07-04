@@ -11,7 +11,7 @@ namespace Steamworks.Data
 	/// You can override all the virtual functions to turn it into what you
 	/// want it to do.
 	/// </summary>
-	public struct Connection : IEquatable<Connection>
+	public struct Connection : IEquatable<Connection>, IDisposable
 	{
 		public uint Id { get; set; }
 
@@ -177,6 +177,11 @@ namespace Steamworks.Data
 		public Result ConfigureConnectionLanes( int[] lanePriorities, ushort[] laneWeights )
 		{
 			return SteamNetworkingSockets.Internal.ConfigureConnectionLanes( this, lanePriorities.Length, lanePriorities, laneWeights );
+		}
+
+		public void Dispose()
+		{
+			Close();
 		}
 	}
 }

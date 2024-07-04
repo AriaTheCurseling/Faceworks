@@ -1,10 +1,11 @@
 ﻿
+using System;
 using System.Runtime.InteropServices;
 
 namespace Steamworks.Data
 {
 	[StructLayout( LayoutKind.Sequential )]
-	public struct Socket
+	public struct Socket : IDisposable
 	{
 		internal uint Id;
 		public override string ToString() => Id.ToString();
@@ -15,9 +16,9 @@ namespace Steamworks.Data
 		/// Destroy a listen socket.  All the connections that were accepting on the listen
 		/// socket are closed ungracefully.
 		/// </summary>
-		public bool Close()
+		public void Dispose()
 		{
-			return SteamNetworkingSockets.Internal.CloseListenSocket( Id );
+			SteamNetworkingSockets.Internal.CloseListenSocket( Id );
 		}
 
 		public SocketManager Manager

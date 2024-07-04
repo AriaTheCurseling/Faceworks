@@ -16,11 +16,11 @@ namespace Steamworks
 	/// </summary>
 	public partial class SocketManager : IDisposable
 	{
-		// public ISocketManager Interface { get; set; }
+		public bool _disposed = false;
 
 		public HashSet<Connection> Connecting = new();
 		public HashSet<Connection> Connected = new();
-		
+
 		public Socket Socket { get; internal set; }
 
 		internal HSteamNetPollGroup pollGroup;
@@ -43,17 +43,34 @@ namespace Steamworks
 			pollGroup = SteamNetworkingSockets.Internal.CreatePollGroup();
 		}
 
+		~SocketManager() => DisposeUnmanaged();
+
 		public void Dispose()
 		{
-			if ( SteamNetworkingSockets.Internal.IsValid )
-			{
-				SteamNetworkingSockets.Internal.DestroyPollGroup( pollGroup );
-				Socket.Close();
-			}
+			if (_disposed) return;
 
-			pollGroup = 0;
+			_disposed = true;
+
+			GC.SuppressFinalize(this);
+
+			DisposeUnmanaged();
+			DisposeManaged();
+		}
+
+		private void DisposeManaged()
+		{
+			Socket.Dispose();
+
 			Socket = 0;
 		}
+
+		protected void DisposeUnmanaged() {
+			SteamNetworkingSockets.Internal.DestroyPollGroup( pollGroup );
+
+			pollGroup = 0;
+		}
+
+
 
 		public virtual void OnConnectionChanged( Connection connection, ConnectionInfo info )
 		{
@@ -105,7 +122,7 @@ namespace Steamworks
 		public int Receive( int bufferSize = 32, bool receiveToEnd = true )
 		{
 			int processed = 0;
-			IntPtr messageBuffer = Marshal.AllocHGlobal( IntPtr.Size * bufferSize );
+			IntPtr messageBuffer = Marshal.AllocHGlobal( IntPtr.Size * bufferSize ); //TODO:: consider replacing with Span<IntPtr>
 
 			try
 			{
