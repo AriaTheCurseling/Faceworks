@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +16,7 @@ namespace Steamworks
     [DeploymentItem( "steam_api.dll" )]
     public partial class NetworkingSocketsTest
 	{
+
 		void DebugOutput( NetDebugOutput type, string text )
 		{
 			Console.WriteLine( $"[NET:{type}]\t\t{text}" );
@@ -158,6 +161,50 @@ namespace Steamworks
 				var n = NetAddress.AnyIp( 5543 );
 				Assert.AreEqual( n.ToString(), "[::]:5543" );
 			}
+		}
+
+	    volatile int receivedCount = 0;
+
+
+		[TestMethod]
+		public async Task SendMessageSpeedTest() {
+			// Create manager with dummy ip
+			
+        	using var server = SteamNetworkingSockets.CreateRelaySocket<SocketManager>(10);
+        	var manager = SteamNetworkingSockets.ConnectRelay<ConnectionManager>(SteamClient.SteamId, 10);
+			
+	        server.onMessage += OnMessage;
+
+			// Create data
+			var raw_data = new float[100];
+
+			Stopwatch sw = new Stopwatch();
+			sw.Start();
+
+			for (int i = 0; i < 100; i++)
+			{
+				var dataHandle = GCHandle.Alloc(raw_data, GCHandleType.Pinned);
+
+				manager.Connection.SendMessage(dataHandle, raw_data.Length * sizeof(float));
+			}
+
+			sw.Stop();
+
+			await Task.Delay( 2000 );
+
+			server.Receive();
+
+			Console.WriteLine($"Time Elapsed: {sw.Elapsed}");
+			Assert.Inconclusive();
+		}
+
+		
+		void OnMessage(ReadOnlySpan<byte> data, Connection connection, NetIdentity identity, long messageNum, long recvTime, int channel){
+			// float value = MemoryMarshal.Read<float>(data);
+
+			// Debug.Log($"Ping: {(Time.time - value) * 1000}");
+
+			receivedCount += 1;
 		}
 	}
 
