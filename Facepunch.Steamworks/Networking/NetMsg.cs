@@ -21,14 +21,18 @@ namespace Steamworks.Data
 		internal ushort IdxLane;
 		private ushort _pad1__;
 
-		internal static Span<byte> GetData(NetMsg* msg) => new(msg->_DataPtr, msg->_DataSize);
-		internal static void SetData(NetMsg* msg, Span<byte> data) {
-			msg->_DataHandle = GCHandle.Alloc(data.GetPinnableReference(), GCHandleType.Pinned);
+		internal Span<byte> test => new(_DataPtr, _DataSize);
 
-			msg->_FreeDataPtr = FreeFunctionPointer;
-			
-			msg->_DataPtr = msg->_DataHandle.AddrOfPinnedObject();
-			msg->_DataSize = data.Length;
+		internal Span<byte> Data {
+			get => new(_DataPtr, _DataSize);
+			set {
+				_DataHandle = GCHandle.Alloc(@value.GetPinnableReference(), GCHandleType.Pinned);
+
+				_FreeDataPtr = FreeFunctionPointer;
+				
+				_DataPtr = _DataHandle.AddrOfPinnedObject();
+				_DataSize = @value.Length;
+			}
 		}
 
 		#region Free Data

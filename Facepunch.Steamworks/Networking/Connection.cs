@@ -80,8 +80,7 @@ namespace Steamworks.Data
 			message->Connection = this;
 			message->Flags = sendType;
 			message->IdxLane = laneIndex;
-			
-			NetMsg.SetData(message, data);
+			message->Data = data;
 
 			long messageNumber = 0;
 			SteamNetworkingSockets.Internal.SendMessages( 1, &message, &messageNumber );

@@ -129,7 +129,7 @@ namespace Steamworks
 		{
 			try
 			{
-				onMessage?.Invoke(NetMsg.GetData(msg), msg->Connection, msg->Identity, msg->MessageNumber, msg->RecvTime, msg->Channel);
+				onMessage?.Invoke(msg->Data, msg->Connection, msg->Identity, msg->MessageNumber, msg->RecvTime, msg->Channel);
 			}
 			finally
 			{

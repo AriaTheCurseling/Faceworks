@@ -167,7 +167,7 @@ namespace Steamworks
 				messages[i] = SteamNetworkingUtils.AllocateMessage();
 				messages[i]->Connection = connections[i];
 				messages[i]->Flags = sendType;
-				NetMsg.SetData(messages[i], data);
+				messages[i]->Data = data;
 			}
 
 			SteamNetworkingSockets.Internal.SendMessages( connectionCount, messages, messageNumberOrResults );
@@ -225,7 +225,7 @@ namespace Steamworks
 		{
 			try
 			{
-				onMessage?.Invoke(NetMsg.GetData(msg), msg->MessageNumber, msg->RecvTime, msg->Channel);
+				onMessage?.Invoke(msg->Data, msg->MessageNumber, msg->RecvTime, msg->Channel);
 			}
 			finally
 			{
