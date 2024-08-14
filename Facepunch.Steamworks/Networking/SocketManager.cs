@@ -104,25 +104,17 @@ namespace Steamworks
 			}
 		}
 
-		public int Receive( int bufferSize = 32, bool receiveToEnd = true )
+		public unsafe int Receive( int bufferSize = 32, bool receiveToEnd = true )
 		{
 			int processed = 0;
-			IntPtr messageBuffer = Marshal.AllocHGlobal( IntPtr.Size * bufferSize );
+			NetMsg** messageBuffer = stackalloc NetMsg*[bufferSize];
 
-			try
-			{
-				processed = SteamNetworkingSockets.Internal.ReceiveMessagesOnPollGroup( pollGroup, messageBuffer, bufferSize );
+			processed = SteamNetworkingSockets.Internal.ReceiveMessagesOnPollGroup( pollGroup, (IntPtr) messageBuffer, bufferSize );
 
-				for ( int i = 0; i < processed; i++ )
-				{
-					ReceiveMessage( Marshal.ReadIntPtr( messageBuffer, i * IntPtr.Size ) );
-				}
-			}
-			finally
+			for ( int i = 0; i < processed; i++ )
 			{
-				Marshal.FreeHGlobal( messageBuffer );
+				ReceiveMessage( messageBuffer[i] );
 			}
-			
 
 			//
 			// Overwhelmed our buffer, keep going
@@ -133,19 +125,18 @@ namespace Steamworks
 			return processed;
 		}
 
-		internal unsafe void ReceiveMessage( IntPtr msgPtr )
+		internal unsafe void ReceiveMessage( NetMsg* msg )
 		{
-			var msg = Marshal.PtrToStructure<NetMsg>( msgPtr );
 			try
 			{
-				onMessage?.Invoke(new Span<byte>(msg.DataPtr.ToPointer(), msg.DataSize), msg.Connection, msg.Identity, msg.MessageNumber, msg.RecvTime, msg.Channel);
+				onMessage?.Invoke(NetMsg.GetData(msg), msg->Connection, msg->Identity, msg->MessageNumber, msg->RecvTime, msg->Channel);
 			}
 			finally
 			{
 				//
 				// Releases the message
 				//
-				NetMsg.InternalRelease( (NetMsg*) msgPtr );
+				NetMsg.InternalRelease( msg );
 			}
 		}
 	}

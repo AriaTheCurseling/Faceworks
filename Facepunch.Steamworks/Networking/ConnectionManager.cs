@@ -104,7 +104,7 @@ namespace Steamworks
 				{
 					for ( int i = 0; i < processed; i++ )
 					{
-						ReceiveMessage( ref messageBuffer[i] );
+						ReceiveMessage( messageBuffer[i] );
 					}
 				}
 				catch
@@ -136,11 +136,10 @@ namespace Steamworks
 		/// </summary>
 		/// <param name="connections">The connections to send the message to.</param>
 		/// <param name="connectionCount">The number of connections to send the message to, to allow reusing the connections array.</param>
-		/// <param name="ptr">Pointer to the message data.</param>
-		/// <param name="size">Size of the message data.</param>
+		/// <param name="data">The message data.</param>
 		/// <param name="sendType">Flags to control delivery of the message.</param>
 		/// <param name="results">An optional array to hold the results of sending the messages for each connection.</param>
-		public unsafe void SendMessages( Connection[] connections, int connectionCount, IntPtr ptr, int size, SendType sendType = SendType.Reliable, Result[] results = null )
+		public unsafe void SendMessages( Connection[] connections, int connectionCount, Span<byte> data, SendType sendType = SendType.Reliable, Result[] results = null )
 		{
 			if ( connections == null )
 				throw new ArgumentNullException( nameof( connections ) );
@@ -150,11 +149,8 @@ namespace Steamworks
 				throw new ArgumentException( "`results` must have at least `connectionCount` entries", nameof( results ) );
 			if ( connectionCount > 1024 ) // restricting this because we stack allocate based on this value
 				throw new ArgumentOutOfRangeException( nameof( connectionCount ) );
-			if ( ptr == IntPtr.Zero )
-				throw new ArgumentNullException( nameof( ptr ) );
-			if ( size == 0 )
-				throw new ArgumentException( "`size` cannot be zero", nameof( size ) );
-
+			if ( data.Length == 0 )
+				throw new ArgumentException( "`size` cannot be zero", nameof( data.Length ) );
 			if ( connectionCount == 0 )
 				return;
 
@@ -162,8 +158,6 @@ namespace Steamworks
 			//   1. We don't want a copy per message. They all refer to the same data. This is the benefit of using Broadcast vs. many sends.
 			//   2. We need to use unmanaged memory. Managed memory may move around and invalidate pointers so it's not an option.
 			//   3. We'll use a reference counter and custom free() function to release this unmanaged memory.
-			var copyPtr = BufferManager.Get( size, connectionCount );
-			Buffer.MemoryCopy( (void*)ptr, (void*)copyPtr, size, size );
 
 			var messages = stackalloc NetMsg*[connectionCount];
 			var messageNumberOrResults = stackalloc long[results != null ? connectionCount : 0];
@@ -173,9 +167,7 @@ namespace Steamworks
 				messages[i] = SteamNetworkingUtils.AllocateMessage();
 				messages[i]->Connection = connections[i];
 				messages[i]->Flags = sendType;
-				messages[i]->DataPtr = copyPtr;
-				messages[i]->DataSize = size;
-				messages[i]->FreeDataPtr = BufferManager.FreeFunctionPointer;
+				NetMsg.SetData(messages[i], data);
 			}
 
 			SteamNetworkingSockets.Internal.SendMessages( connectionCount, messages, messageNumberOrResults );
@@ -196,44 +188,44 @@ namespace Steamworks
 			}
 		}
 
-		/// <summary>
-		/// Ideally should be using an IntPtr version unless you're being really careful with the byte[] array and 
-		/// you're not creating a new one every frame (like using .ToArray())
-		/// </summary>
-		public unsafe void SendMessages( Connection[] connections, int connectionCount, byte[] data, SendType sendType = SendType.Reliable, Result[] results = null )
-		{
-			fixed ( byte* ptr = data )
-			{
-				SendMessages( connections, connectionCount, (IntPtr)ptr, data.Length, sendType, results );
-			}
-		}
+		// /// <summary>
+		// /// Ideally should be using an IntPtr version unless you're being really careful with the byte[] array and 
+		// /// you're not creating a new one every frame (like using .ToArray())
+		// /// </summary>
+		// public unsafe void SendMessages( Connection[] connections, int connectionCount, byte[] data, SendType sendType = SendType.Reliable, Result[] results = null )
+		// {
+		// 	fixed ( byte* ptr = data )
+		// 	{
+		// 		SendMessages( connections, connectionCount, (IntPtr)ptr, data.Length, sendType, results );
+		// 	}
+		// }
 
-		/// <summary>
-		/// Ideally should be using an IntPtr version unless you're being really careful with the byte[] array and 
-		/// you're not creating a new one every frame (like using .ToArray())
-		/// </summary>
-		public unsafe void SendMessages( Connection[] connections, int connectionCount, byte[] data, int offset, int length, SendType sendType = SendType.Reliable, Result[] results = null )
-		{
-			fixed ( byte* ptr = data )
-			{
-				SendMessages( connections, connectionCount, (IntPtr)ptr + offset, length, sendType, results );
-			}
-		}
+		// /// <summary>
+		// /// Ideally should be using an IntPtr version unless you're being really careful with the byte[] array and 
+		// /// you're not creating a new one every frame (like using .ToArray())
+		// /// </summary>
+		// public unsafe void SendMessages( Connection[] connections, int connectionCount, byte[] data, int offset, int length, SendType sendType = SendType.Reliable, Result[] results = null )
+		// {
+		// 	fixed ( byte* ptr = data )
+		// 	{
+		// 		SendMessages( connections, connectionCount, (IntPtr)ptr + offset, length, sendType, results );
+		// 	}
+		// }
 
-		/// <summary>
-		/// This creates a ton of garbage - so don't do anything with this beyond testing!
-		/// </summary>
-		public void SendMessages( Connection[] connections, int connectionCount, string str, SendType sendType = SendType.Reliable, Result[] results = null )
-		{
-			var bytes = System.Text.Encoding.UTF8.GetBytes( str );
-			SendMessages( connections, connectionCount, bytes, sendType, results );
-		}
+		// /// <summary>
+		// /// This creates a ton of garbage - so don't do anything with this beyond testing!
+		// /// </summary>
+		// public void SendMessages( Connection[] connections, int connectionCount, string str, SendType sendType = SendType.Reliable, Result[] results = null )
+		// {
+		// 	var bytes = System.Text.Encoding.UTF8.GetBytes( str );
+		// 	SendMessages( connections, connectionCount, bytes, sendType, results );
+		// }
 
-		internal unsafe void ReceiveMessage( ref NetMsg* msg )
+		internal unsafe void ReceiveMessage( NetMsg* msg )
 		{
 			try
 			{
-				onMessage?.Invoke(new Span<byte>(msg->DataPtr.ToPointer(), msg->DataSize), msg->MessageNumber, msg->RecvTime, msg->Channel);
+				onMessage?.Invoke(NetMsg.GetData(msg), msg->MessageNumber, msg->RecvTime, msg->Channel);
 			}
 			finally
 			{

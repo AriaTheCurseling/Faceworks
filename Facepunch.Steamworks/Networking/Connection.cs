@@ -70,23 +70,18 @@ namespace Steamworks.Data
 		/// <summary>
 		/// This is the best version to use.
 		/// </summary>
-		public unsafe Result SendMessage( IntPtr ptr, int size, SendType sendType = SendType.Reliable, ushort laneIndex = 0 )
+		public unsafe Result SendMessage( Span<byte> data, SendType sendType = SendType.Reliable, ushort laneIndex = 0 )
 		{
-			if ( ptr == IntPtr.Zero )
-				throw new ArgumentNullException( nameof( ptr ) );
-			if ( size == 0 )
-				throw new ArgumentException( "`size` cannot be zero", nameof( size ) );
-
-			var copyPtr = BufferManager.Get( size, 1 );
-			Buffer.MemoryCopy( (void*)ptr, (void*)copyPtr, size, size );
+			if ( data.Length == 0 )
+				throw new ArgumentException( "`size` cannot be zero", nameof( data.Length ) );
 
 			var message = SteamNetworkingUtils.AllocateMessage();
+
 			message->Connection = this;
 			message->Flags = sendType;
-			message->DataPtr = copyPtr;
-			message->DataSize = size;
-			message->FreeDataPtr = BufferManager.FreeFunctionPointer;
 			message->IdxLane = laneIndex;
+			
+			NetMsg.SetData(message, data);
 
 			long messageNumber = 0;
 			SteamNetworkingSockets.Internal.SendMessages( 1, &message, &messageNumber );
@@ -94,81 +89,6 @@ namespace Steamworks.Data
 			return messageNumber >= 0
 				? Result.OK
 				: (Result)(-messageNumber);
-		}
-
-		/// <summary>
-		/// This is the best version to use.
-		/// </summary>
-		public unsafe Result SendMessage( GCHandle dataHandle, int size, SendType sendType = SendType.Reliable, ushort laneIndex = 0 )
-		{
-			if ( size == 0 )
-				throw new ArgumentException( "`size` cannot be zero", nameof( size ) );
-
-			var ptr = dataHandle.AddrOfPinnedObject();
-
-			var message = SteamNetworkingUtils.AllocateMessage();
-			message->Connection = this;
-			message->Flags = sendType;
-			message->DataPtr = ptr;
-			message->DataSize = size;
-			message->FreeDataPtr = FreeFunctionPointer;
-			message->IdxLane = laneIndex;
-			message->DataHandle = dataHandle;
-
-			long messageNumber = 0;
-			SteamNetworkingSockets.Internal.SendMessages( 1, &message, &messageNumber );
-
-			return messageNumber >= 0
-				? Result.OK
-				: (Result)(-messageNumber);
-		}
-		
-		[UnmanagedFunctionPointer( CallingConvention.Cdecl )]
-		private unsafe delegate void FreeFn( NetMsg* msg );
-		
-		private unsafe static readonly FreeFn FreeFunctionPin = new FreeFn( Free );
-
-		public static readonly IntPtr FreeFunctionPointer = Marshal.GetFunctionPointerForDelegate( FreeFunctionPin );
-
-		[MonoPInvokeCallback]
-		private unsafe static void Free( NetMsg* msg )
-		{
-			msg->DataHandle.value.Free();
-		}
-
-		/// <summary>
-		/// Send message from a span, unlike the byte array implementation, this creates no undue overhead
-		/// </summary>
-		public unsafe Result SendMessage(Span<byte> data, SendType sendType = SendType.Reliable, ushort laneIndex = 0 )
-		{
-			fixed ( byte* ptr = data )
-			{
-				return SendMessage( (IntPtr)ptr, data.Length, sendType, laneIndex );
-			}
-		}
-
-		/// <summary>
-		/// Ideally should be using an IntPtr version unless you're being really careful with the byte[] array and 
-		/// you're not creating a new one every frame (like using .ToArray())
-		/// </summary>
-		public unsafe Result SendMessage( byte[] data, SendType sendType = SendType.Reliable, ushort laneIndex = 0 )
-		{
-			fixed ( byte* ptr = data )
-			{
-				return SendMessage( (IntPtr)ptr, data.Length, sendType, laneIndex );
-			}
-		}
-
-		/// <summary>
-		/// Ideally should be using an IntPtr version unless you're being really careful with the byte[] array and 
-		/// you're not creating a new one every frame (like using .ToArray())
-		/// </summary>
-		public unsafe Result SendMessage( byte[] data, int offset, int length, SendType sendType = SendType.Reliable, ushort laneIndex = 0 )
-		{
-			fixed ( byte* ptr = data )
-			{
-				return SendMessage( (IntPtr)ptr + offset, length, sendType, laneIndex );
-			}
 		}
 
 		/// <summary>

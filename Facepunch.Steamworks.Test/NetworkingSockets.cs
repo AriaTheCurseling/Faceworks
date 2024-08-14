@@ -184,9 +184,7 @@ namespace Steamworks
 
 			for (int i = 0; i < 100; i++)
 			{
-				var dataHandle = GCHandle.Alloc(raw_data, GCHandleType.Pinned);
-
-				manager.Connection.SendMessage(dataHandle, raw_data.Length * sizeof(float));
+				manager.Connection.SendMessage(MemoryMarshal.AsBytes<float>(raw_data));
 			}
 
 			sw.Stop();
